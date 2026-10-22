@@ -1,0 +1,7 @@
+.godot/
+.import/
+bin/Debug/
+obj/
+export/
+*.tmp
+_*

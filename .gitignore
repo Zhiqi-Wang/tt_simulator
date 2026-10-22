@@ -1,0 +1,26 @@
+# scratch / debug output
+_*
+*.txt
+!requirements.txt
+!**/CREDITS.txt
+*.log
+*.png
+!godot/**/*.png
+__pycache__/
+*.pyc
+*.nbi
+*.nbc
+
+# old backups
+backup_v1/
+physics_rl_old.html
+
+# models: only keep the ones in use
+models/*
+!models/policy.npz
+!models/policy_v41_backup.npz
+
+# build output
+core/*.dll
+core/*.o
+core/build/

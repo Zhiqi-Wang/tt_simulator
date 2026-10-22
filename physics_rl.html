@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>乒乓物理引擎 &amp; 强化学习设计</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --line:#2b3444;
+    --txt:#d7dee9; --dim:#8b98ab; --cyan:#4cc9f0; --amber:#f2b35c;
+    --green:#6ee7a8; --red:#ff8b82; --violet:#b197fc;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--txt);
+    font-family:"Segoe UI","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+    line-height:1.75; font-size:15px;
+  }
+  a{color:var(--cyan); text-decoration:none}
+  a:hover{text-decoration:underline}
+  code,.mono{
+    font-family:ui-monospace,Consolas,"Cascadia Mono",monospace;
+    font-size:.9em; background:#0b0f16; border:1px solid var(--line);
+    border-radius:4px; padding:.1em .35em; color:#c8d6ea;
+  }
+  header{
+    padding:56px 24px 40px; text-align:center;
+    background:
+      radial-gradient(700px 240px at 50% -40px, rgba(76,201,240,.18), transparent 70%),
+      linear-gradient(180deg,#0d1117,#0d1117);
+    border-bottom:1px solid var(--line);
+  }
+  header h1{
+    margin:0 0 12px; font-size:34px; letter-spacing:.5px;
+    background:linear-gradient(92deg,#8fe3ff,#4cc9f0 40%,#f2b35c);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  header p{margin:0; color:var(--dim)}
+  .badges{margin-top:18px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap}
+  .badge{
+    font-size:12px; padding:4px 10px; border-radius:999px;
+    border:1px solid var(--line); background:var(--panel); color:var(--dim);
+  }
+  nav{
+    position:sticky; top:0; z-index:20; background:rgba(13,17,23,.92);
+    backdrop-filter:blur(8px); border-bottom:1px solid var(--line);
+    padding:10px 16px; display:flex; gap:6px; overflow-x:auto; white-space:nowrap;
+  }
+  nav a{
+    font-size:13px; padding:5px 11px; border-radius:6px; color:var(--dim);
+    border:1px solid transparent;
+  }
+  nav a:hover{color:var(--txt); background:var(--panel); text-decoration:none; border-color:var(--line)}
+  main{max-width:1080px; margin:0 auto; padding:8px 22px 90px}
+  section{padding:40px 0 8px; border-bottom:1px dashed rgba(43,52,68,.7)}
+  section:last-child{border-bottom:none}
+  h2{
+    font-size:23px; margin:0 0 6px; display:flex; align-items:center; gap:12px;
+  }
+  h2 .num{
+    font-size:12px; font-weight:600; color:var(--cyan); background:rgba(76,201,240,.1);
+    border:1px solid rgba(76,201,240,.35); border-radius:6px; padding:2px 8px;
+    letter-spacing:1px;
+  }
+  h3{font-size:17px; margin:26px 0 8px; color:#eaf2ff}
+  h4{font-size:14px; margin:18px 0 6px; color:var(--amber); letter-spacing:.4px}
+  .lead{color:var(--dim); margin:0 0 18px; max-width:80ch}
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:16px 18px; margin:14px 0;
+  }
+  .grid{display:grid; gap:14px}
+  .g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+  @media(max-width:820px){.g2,.g3,.g4{grid-template-columns:1fr}}
+  .kpi{background:linear-gradient(180deg,var(--panel2),var(--panel)); border:1px solid var(--line);
+       border-radius:10px; padding:14px 16px}
+  .kpi .v{font-size:22px; font-weight:700; color:var(--cyan); letter-spacing:.3px}
+  .kpi .k{font-size:12px; color:var(--dim); margin-top:2px}
+  .kpi.amber .v{color:var(--amber)} .kpi.green .v{color:var(--green)} .kpi.red .v{color:var(--red)}
+  .eq{
+    font-family:ui-monospace,Consolas,monospace; font-size:14px; color:#dce8ff;
+    background:#0b0f16; border-left:3px solid var(--cyan); border-radius:0 8px 8px 0;
+    padding:12px 16px; margin:12px 0; overflow-x:auto;
+  }
+  .eq .c{color:var(--dim)} .eq .a{color:var(--amber)} .eq .g{color:var(--green)}
+  table{width:100%; border-collapse:collapse; margin:12px 0; font-size:13.5px}
+  th,td{text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top}
+  th{color:var(--dim); font-weight:600; font-size:12px; letter-spacing:.5px; text-transform:uppercase}
+  tr:hover td{background:rgba(76,201,240,.04)}
+  td.num{font-family:ui-monospace,Consolas,monospace; color:var(--amber); white-space:nowrap}
+  .tag{display:inline-block; font-size:11px; padding:1px 7px; border-radius:5px;
+       border:1px solid var(--line); color:var(--dim); background:#11161f}
+  .tag.cy{color:var(--cyan); border-color:rgba(76,201,240,.4)}
+  .tag.am{color:var(--amber); border-color:rgba(242,179,92,.4)}
+  .tag.gr{color:var(--green); border-color:rgba(110,231,168,.4)}
+  .tag.rd{color:var(--red); border-color:rgba(255,139,130,.4)}
+  .flow{display:flex; align-items:stretch; gap:10px; flex-wrap:wrap; margin:16px 0}
+  .flow .step{
+    flex:1 1 150px; background:var(--panel2); border:1px solid var(--line);
+    border-radius:9px; padding:11px 12px; position:relative;
+  }
+  .flow .step b{display:block; font-size:13px; color:#eaf2ff}
+  .flow .step span{font-size:12px; color:var(--dim)}
+  .flow .arrow{align-self:center; color:var(--dim); font-size:18px}
+  ul.tight{margin:8px 0; padding-left:20px}
+  ul.tight li{margin:5px 0}
+  .note{
+    border-left:3px solid var(--amber); background:rgba(242,179,92,.06);
+    border-radius:0 8px 8px 0; padding:10px 14px; margin:14px 0; color:#e6d3b3; font-size:13.5px;
+  }
+  .note b{color:var(--amber)}
+  .warn{border-left-color:var(--red); background:rgba(255,139,130,.06); color:#f2c7c3}
+  .warn b{color:var(--red)}
+  .formula{color:#cfe0f5}
+  .sub{color:var(--dim); font-size:12.5px}
+  canvas{width:100%; height:auto; display:block; background:#0a0e14;
+         border:1px solid var(--line); border-radius:10px}
+  .legend{display:flex; gap:16px; flex-wrap:wrap; margin-top:10px; font-size:12.5px; color:var(--dim)}
+  .legend i{display:inline-block; width:22px; height:3px; border-radius:2px; margin-right:6px; vertical-align:middle}
+  .footer{color:var(--dim); font-size:12.5px; text-align:center; padding-top:26px}
+  .dialog{border:1px solid var(--line); border-radius:10px; padding:12px 16px; margin:12px 0;
+          background:linear-gradient(180deg,#121821,#0f141c)}
+  .dialog .who{font-size:12px; color:var(--cyan); letter-spacing:.5px}
+  .dialog .what{font-size:13.5px; color:#cfd9e6}
+  .pill-row{display:flex; gap:8px; flex-wrap:wrap; margin:10px 0}
+  button{
+    font:inherit; font-size:12.5px; color:var(--txt); background:var(--panel2);
+    border:1px solid var(--line); border-radius:999px; padding:5px 13px; cursor:pointer;
+  }
+  button:hover{border-color:var(--cyan); color:#fff}
+  button.on{background:rgba(76,201,240,.15); border-color:var(--cyan); color:#dff6ff}
+  .small{font-size:12.5px; color:var(--dim)}
+  .part{margin:56px 0 0; padding:22px 24px; border-radius:14px; border:1px solid var(--line);
+        background:linear-gradient(120deg,rgba(76,201,240,.12),rgba(242,179,92,.06) 60%,transparent)}
+  .part .pn{font-size:12px; letter-spacing:3px; color:var(--cyan)}
+  .part h1{margin:4px 0 6px; font-size:28px; color:#eaf2ff}
+  .part p{margin:0; color:var(--dim); max-width:86ch}
+  .part.p2{background:linear-gradient(120deg,rgba(177,151,252,.14),rgba(76,201,240,.05) 60%,transparent)}
+  .part.p3{background:linear-gradient(120deg,rgba(110,231,168,.12),rgba(76,201,240,.05) 60%,transparent)}
+  .part.p4{background:linear-gradient(120deg,rgba(255,139,130,.12),rgba(242,179,92,.06) 60%,transparent)}
+  nav .grp{color:#eaf2ff; font-weight:600}
+  nav .sep{color:var(--line); padding:5px 2px}
+  .bars{display:grid; grid-template-columns:72px 1fr 190px; gap:6px 10px; align-items:center; font-size:13px}
+  .bars .bar{height:14px; border-radius:4px; background:#0b0f16; border:1px solid var(--line); position:relative; overflow:hidden}
+  .bars .bar i{position:absolute; top:0; bottom:0}
+  .bars .mid{position:absolute; left:50%; top:-2px; bottom:-2px; width:1px; background:#3a4558}
+  input[type=range]{width:260px; vertical-align:middle}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>乒乓物理引擎 &amp; 强化学习设计</h1>
+  <p>一个从牛顿力学长出来的乒乓球游戏：numba 写物理，PPO 学打法，pygame 画立体球员</p>
+  <div class="badges">
+    <span class="badge">物理：numba · float64 · 2048 张球台并行</span>
+    <span class="badge">策略：PPO · MLP</span>
+    <span class="badge">观测 104 维 · 动作 12 维</span>
+    <span class="badge">左右手 · 横板/直板 · 5 种胶皮</span>
+    <span class="badge">17 种击球技术 · 8 种发球 · 9 种步法</span>
+    <span class="badge">立体人物 · 录音音效</span>
+  </div>
+</header>
+
+<nav>
+  <a class="grp" href="#p1">一 物理引擎</a>
+  <a href="#world">世界与球员</a><a href="#equip">器材</a><a href="#flight">飞行</a><a href="#collide">碰撞与胶皮</a>
+  <a href="#stroke">击球</a><a href="#move">移动</a><a href="#serve">发球</a><a href="#rules">规则</a>
+  <span class="sep">|</span>
+  <a class="grp" href="#p2">二 RL</a>
+  <a href="#rl-obs">观测</a><a href="#rl-act">动作</a><a href="#rl-rew">奖励</a><a href="#rl-tac">战术脑</a>
+  <span class="sep">|</span>
+  <a class="grp" href="#p3">三 RL 训练</a>
+  <a href="#ppo">PPO</a><a href="#lessons">调参教训</a><a href="#retrain">本次重训</a>
+  <span class="sep">|</span>
+  <a class="grp" href="#p4">四 画面渲染</a>
+  <a href="#r3d">立体人物</a><a href="#ranim">击球动作</a><a href="#rfoot">步法动画</a><a href="#rsound">音效</a><a href="#rui">界面</a>
+  <span class="sep">|</span>
+  <a href="#code">代码地图</a>
+</nav>
+
+<main>
+
+<!-- ============ 总览 ============ -->
+<section id="overview">
+  <h2><span class="num">00</span>总览：三层世界</h2>
+  <p class="lead">
+    项目分三层：<b>确定性的物理世界</b>（球怎么飞、拍怎么碰、人怎么跑，全部在 <code>pingpong/sim.py</code>），
+    <b>学出来的决策层</b>（每一拍想打哪、用多大力、加什么旋转，PPO 训练的神经网络），
+    以及<b>只负责“看起来像”的表现层</b>（立体人物、击球与步法动画、音效）。
+    表现层只读物理状态、不改物理，所以动画再怎么调都不会影响胜负。
+  </p>
+  <div class="card">
+    <div class="flow">
+      <div class="step"><b>策略网络</b><span>104 维观测 → 12 维动作意图</span></div>
+      <div class="arrow">→</div>
+      <div class="step"><b>动作解释</b><span>移动 / 落点 / 力量 / 旋转 / 正反手</span></div>
+      <div class="arrow">→</div>
+      <div class="step"><b>击球反解</b><span>plan_stroke 按胶皮求拍面与挥速</span></div>
+      <div class="arrow">→</div>
+      <div class="step"><b>物理碰撞</b><span>racket_impact：恢复 + 摩擦 + 咬球</span></div>
+      <div class="arrow">→</div>
+      <div class="step"><b>表现层</b><span>动画 · 立体绘制 · 音效</span></div>
+    </div>
+  </div>
+  <div class="grid g4">
+    <div class="kpi"><div class="v">1/30 s</div><div class="k">决策步长（每步 8 个物理子步）</div></div>
+    <div class="kpi amber"><div class="v">6 + 4 + 4</div><div class="k">属性 · 球风 · 器材（持拍手/握法/两面胶皮）</div></div>
+    <div class="kpi green"><div class="v">17</div><div class="k">击球技术细分（8 个物理大类）</div></div>
+    <div class="kpi red"><div class="v">0.14 m</div><div class="k">拍到球的最大击球距离</div></div>
+  </div>
+  <div class="note">
+    <b>设计取向：</b>网络不直接输出“球速 30 m/s、角度 17°”，而是输出<b>人的意图</b>（打深一点、八成力、加下旋）。
+    反解器把意图翻译成拍面角度和挥拍速度，再叠加属性、站位、来球、器材带来的误差和限制。
+    所以“长胶造不出旋转”“左手侧旋方向相反”“直板反手发力弱”都是物理结果，不是贴图或硬编码的胜率。
+  </div>
+</section>
+
+<!-- =================================================================== -->
+<div class="part" id="p1">
+  <div class="pn">PART ONE</div>
+  <h1>一、物理引擎</h1>
+  <p>球、拍、台、网、人，全部用同一套刚体冲量模型；所有技术差异都落在可测量的物理量上。</p>
+</div>
+
+<section id="world">
+  <h2><span class="num">1.1</span>坐标系、球员与属性</h2>
+  <p class="lead">右手系，单位米。球台长边是 x，网在 x=0，z 向上，地面 z=0。</p>
+  <div class="card">
+    <div class="eq">
+      x ∈ [−1.37, +1.37]  <span class="c">//</span> 台长 2.74 m，每边 HALF_L = 1.37<br>
+      y ∈ [−0.7625, +0.7625] <span class="c">//</span> 台宽 1.525 m<br>
+      z = 0.76（台面） <span class="c">//</span> 网高 0.1525 m<br>
+      0 号球员在 x&lt;0，1 号在 x&gt;0
+    </div>
+    <p class="small">
+      每个球员的观测和动作都在<b>自己视角</b>下：自己的前方永远是 +x，持拍手一侧永远是“右”。
+      前后方向乘 <code>m = ±1</code>（哪一边），横向再乘持拍手 <code>hs = ±1</code>：
+      <code>lat_m = m·hs</code>，每分开始写入 <code>T[LM0+j]</code>。左手球员因此是右手球员在自己视角下的<b>精确镜像</b>，
+      同一个网络可以控制任意持拍手的球员。
+    </p>
+  </div>
+
+  <h3>人不是一个点：身体 + 持拍手</h3>
+  <div class="grid g2">
+    <div class="card">
+      <h4>身体</h4>
+      <ul class="tight">
+        <li>位置与速度各三维，前后/横向/高度三轴独立加速度控制；高度就是下蹲深浅。</li>
+        <li>“手”是身体之外的偏移：<code>hand_off(blend) = −0.13 − 0.19·blend</code>（自己视角）。</li>
+        <li><code>blend=+1</code> 正手（手在持拍侧），<code>−1</code> 反手（手在身前偏另一侧），中间是切换途中。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>正反手是一个有速度的状态量</h4>
+      <ul class="tight">
+        <li>切换受 <code>srate</code>（敏捷、疲劳、上一拍技术的还原时间）限制。</li>
+        <li>切换途中 <code>awk</code> 变大：挥拍速度下降、误差上升。</li>
+        <li>所以“先动脚再动手”是划算的：站稳、切换完成再击球，球质明显更高。</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>六个属性 + 四个球风</h3>
+  <table>
+    <tr><th>属性 / 球风</th><th>影响的物理量</th></tr>
+    <tr><td><b>力量</b></td><td>挥拍速度上限 <code>(12+16·str)</code> m/s、球速</td></tr>
+    <tr><td><b>敏捷</b></td><td>最大移动速度 <code>(1.2+1.2·agi)</code>、加速度、正反手切换速度</td></tr>
+    <tr><td><b>技术</b></td><td>执行误差、落点误差、可用旋转倾角、相持中判断来球旋转、卸力能力</td></tr>
+    <tr><td><b>发球</b></td><td>发球旋转上限、发球控制精度、发球动作隐蔽程度</td></tr>
+    <tr><td><b>反应</b></td><td>反应延迟 <code>0.10+0.25·(1−rea)</code> 秒；接发球看穿发球旋转</td></tr>
+    <tr><td><b>体力</b></td><td>疲劳累积：跑动按 (速度/极速)²，每拍再按力度扣，跨局累积</td></tr>
+    <tr><td>反手偏好 / 旋转 / 力量 / 大角度</td><td>只通过风格奖励影响选择，不直接改物理（性格，不是能力）</td></tr>
+  </table>
+</section>
+
+<section id="equip">
+  <h2><span class="num">1.2</span>器材：持拍手、握法、胶皮</h2>
+  <p class="lead">
+    器材写在每名球员的属性向量里（<code>S[HAND], S[GRIP], S[RFH], S[RBH]</code>），物理和观测都会用到。
+    参数来自资料里各类胶皮的定性特征（反胶摩擦大、正胶颗粒朝外出球快、长胶颗粒易倒“倒转”来球、防弧表面不黏），
+    再按碰撞模型标定成三个数。
+  </p>
+  <table>
+    <tr><th>胶皮</th><th>恢复 e</th><th>摩擦 μ</th><th>咬球 ks</th><th>表现</th><th>训练抽样（正/反手）</th></tr>
+    <tr><td><b>反胶</b></td><td class="num">0.86</td><td class="num">1.20</td><td class="num">1.45</td><td>旋转最强，也最吃对方的转</td><td class="num">82% / 60%</td></tr>
+    <tr><td><b>正胶</b></td><td class="num">0.88</td><td class="num">0.55</td><td class="num">0.80</td><td>颗粒朝外，出球快，旋转一般，不太吃转</td><td class="num">10% / 10%</td></tr>
+    <tr><td><b>生胶</b></td><td class="num">0.90</td><td class="num">0.40</td><td class="num">0.55</td><td>更硬更弹，出球最快最平，球“沉”</td><td class="num">6% / 10%</td></tr>
+    <tr><td><b>长胶</b></td><td class="num">0.72</td><td class="num">0.14</td><td class="num">0.15</td><td>自己几乎造不出旋转；对方拉上旋，挡回去变下旋</td><td class="num">1% / 13%</td></tr>
+    <tr><td><b>防弧</b></td><td class="num">0.70</td><td class="num">0.20</td><td class="num">0.25</td><td>出球慢，卸掉来球的冲力和旋转</td><td class="num">1% / 7%</td></tr>
+  </table>
+  <div class="grid g2">
+    <div class="card">
+      <h4>胶皮怎么进入物理</h4>
+      <ul class="tight">
+        <li>碰撞：<code>racket_impact(v, ω, n, v_拍, e, μ, ks)</code>，每板用这一面的胶皮参数。</li>
+        <li>能做出的拍面倾角上限 <code>rub_spin_cap = min(μ/√(1+μ²), 0.6·ks)</code>：摩擦小就“搓不转、拉不转”。</li>
+        <li>反解 <code>plan_stroke</code> 也按这面胶皮的 e、ks 去算，所以球员“知道”自己的胶皮特性。</li>
+        <li>“吃转”不需要特判：ks 小，来球旋转就不容易把球带偏（但旋转会大量保留下来）。</li>
+        <li>ks &gt; 1 表示胶皮切向变形在离拍时回弹（切向恢复，Cross 2005），球的转速能超过“纯滚动”。反胶 ks 1.45、μ 1.2 是按实测转速标定的：
+        职业强力弧圈 100–130 转/秒（顶尖约 150），顶尖下旋发球 60–75 转/秒。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>持拍手与握法</h4>
+      <ul class="tight">
+        <li><b>左手</b>（训练抽样 25%）：站位、够球、发球侧旋、所有动画整体左右镜像。左手发正手侧旋，侧旋方向和右手相反。</li>
+        <li><b>直板</b>（25%）：手指手腕灵活，台内小球误差 ×0.85、发球误差 ×0.88、发球迷惑性 ×1.1；
+          反手横打挥速 ×0.88、误差 ×1.12、旋转 ×0.9；传统推挡更稳（×0.92）。</li>
+        <li>直板的推挡、搓和反手发球用<b>正面胶皮</b>（直板传统打法只用一面），反手横打才用背面。</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>动手看：同一个来球，五种胶皮挡回去</h3>
+  <p class="small">下面用和模拟器一模一样的碰撞公式在浏览器里算：来球 12 m/s 平飞，旋转可调；拍面略前倾、不挥拍（挡）或向前上方挥拍（拉）。</p>
+  <div class="card">
+    <div class="pill-row">
+      <span class="small">来球旋转：</span>
+      <input type="range" id="rubSpin" min="-200" max="250" value="150">
+      <span id="rubSpinV" class="mono">上旋 150 rad/s</span>
+      <button id="rubBlock" class="on">挡</button><button id="rubLoop">拉</button>
+    </div>
+    <div class="bars" id="rubBars"></div>
+    <p class="small" style="margin-top:10px">条形以中线为 0：向右是上旋，向左是下旋。长胶、防弧挡强上旋会回出下旋——这就是“倒转”，没有任何特判。</p>
+  </div>
+</section>
+
+<section id="flight">
+  <h2><span class="num">1.3</span>球的飞行：重力 + 阻力 + 马格努斯</h2>
+  <p class="lead">每个物理子步（1/240 s）做一次半隐式欧拉积分。</p>
+  <div class="eq">
+    <span class="formula">a = −K<sub>D</sub>·|v|·v + K<sub>M</sub>·(ω × v) − g</span>
+    <span class="c">   //  ω 为角速度（rad/s），g = 9.81</span><br>
+    v ← v + a·dt&nbsp;&nbsp;&nbsp; x ← x + v·dt&nbsp;&nbsp;&nbsp; ω ← ω·(1 − 0.05·dt)
+  </div>
+  <div class="grid g2">
+    <div class="card">
+      <h4>系数从哪来</h4>
+      <div class="eq" style="margin-top:6px">K<sub>D</sub> = ½ρ·C<sub>D</sub>·A / m<br>K<sub>M</sub> = ½ρ·C<sub>M</sub>·V / m</div>
+      <p class="small">ρ=1.2 kg/m³，球半径 20 mm，质量 2.7 g，C<sub>D</sub>=0.5、C<sub>M</sub>=0.6：<code>K_D ≈ 0.14</code>、<code>K_M ≈ 0.0034</code>。</p>
+    </div>
+    <div class="card">
+      <h4>量级对吗</h4>
+      <p class="small">转速 150 rad/s、球速 10 m/s 时马格努斯加速度约 <code>0.0034×150×10 ≈ 5 m/s²</code>，约半个 g：
+      强上旋明显“往下扎”、强下旋“往上飘”。旋转每秒衰减 5%，一个来回后仍有七成。</p>
+    </div>
+  </div>
+  <h3>动手看：旋转怎么改变弧线</h3>
+  <p class="small">同样出手点、同样水平速度，只改旋转；竖直初速用二分求出，让三条球落在同一点——正是 <code>plan_shot</code> 做的事。</p>
+  <div class="card">
+    <canvas id="traj" width="900" height="330"></canvas>
+    <div class="legend">
+      <span><i style="background:#f2b35c"></i>下旋 −120 rad/s</span>
+      <span><i style="background:#8b98ab"></i>不转 0</span>
+      <span><i style="background:#4cc9f0"></i>上旋 +180 rad/s</span>
+    </div>
+  </div>
+  <div class="note">
+    旋转由“上旋量 top”和“侧旋量 side”两个标量生成：<code>ω = top·(−v_y, v_x, 0)/|v_h| + side·(0,0,1)</code>。
+    左手球员的侧旋在世界坐标里自动取反（<code>side ×= hs</code>）。
+  </div>
+</section>
+
+<section id="collide">
+  <h2><span class="num">1.4</span>碰撞：台面、球拍（胶皮）、网、台沿</h2>
+  <h3>台面</h3>
+  <div class="card">
+    <div class="eq">
+      v<sub>z</sub> ← −E<sub>table</sub>·v<sub>z</sub>&nbsp;&nbsp;<span class="c">// E = 0.89</span><br>
+      u = v<sub>水平</sub> − ω × r&nbsp;&nbsp;<span class="c">// 接触点滑动速度</span><br>
+      j<sub>t</sub> = min(0.4·|u|, μ·(1+E)·v<sub>z</sub><sup>in</sup>)&nbsp;&nbsp;<span class="c">// μ = 0.25</span>
+    </div>
+    <p class="small">上旋落台往前窜、下旋落台“刹车”，是冲量方程自然给出的结果。</p>
+  </div>
+  <h3>球拍：能咬住球，还是打滑</h3>
+  <div class="card">
+    <div class="eq">
+      u = v<sub>球</sub> − v<sub>拍</sub>；&nbsp;j<sub>n</sub> = −(1 + e)·(u·n)<br>
+      s = (u − r·ω × n) 的切向分量<br>
+      j<sub>t</sub> = −min(ks·K<sub>stick</sub>·|s|, μ·j<sub>n</sub>)·ŝ&nbsp;&nbsp;<span class="c">// K_stick = 0.4，e/μ/ks 由胶皮决定</span><br>
+      v ← v + j<sub>n</sub>·n + j<sub>t</sub>&nbsp;&nbsp;&nbsp; ω ← ω − (n × j<sub>t</sub>)/(K·r)
+    </div>
+    <p class="small">切向速度小时 <code>ks·K_stick·|s|</code> 占优，胶皮“咬住”球；否则按库仑摩擦打滑。
+    出球旋转<b>完全来自</b>这次接触的切向冲量。实测（来球 12 m/s、上旋 150 rad/s；最后一行来球 8 m/s 不转），单位 rad/s：</p>
+    <table>
+      <tr><th>场景</th><th>反胶</th><th>正胶</th><th>生胶</th><th>长胶</th><th>防弧</th></tr>
+      <tr><td>挡（不挥拍）</td><td class="num">上旋 41</td><td class="num">下旋 35</td><td class="num">下旋 64</td><td class="num">下旋 121</td><td class="num">下旋 102</td></tr>
+      <tr><td>向前上方拉</td><td class="num">上旋 423</td><td class="num">上旋 194</td><td class="num">上旋 108</td><td class="num">下旋 64</td><td class="num">下旋 7</td></tr>
+      <tr><td>拉不转球</td><td class="num">上旋 407</td><td class="num">上旋 244</td><td class="num">上旋 183</td><td class="num">上旋 61</td><td class="num">上旋 102</td></tr>
+    </table>
+  </div>
+  <div class="grid g2">
+    <div class="card"><h4>擦网</h4>
+      <p class="small">球心过网平面时在网顶附近，以 <code>cord<sup>0.7</sup></code> 的概率蹭过去（速度降到 25–60%、旋转减半），
+      否则弹回。发球擦网后仍落对方台面算重发。</p></div>
+    <div class="card"><h4>擦边</h4>
+      <p class="small">球心在台外 0.6·r 以内且向下运动：算有效落台，但反弹极低极平，几乎接不到。</p></div>
+  </div>
+</section>
+
+<section id="stroke">
+  <h2><span class="num">1.5</span>击球：从意图到挥拍</h2>
+  <div class="card">
+    <div class="flow">
+      <div class="step"><b>① 意图</b><span>落点深度、横向、力度、上/下旋、侧旋</span></div>
+      <div class="arrow">→</div>
+      <div class="step"><b>② 判定技术</b><span>classify_stroke + tech_of</span></div>
+      <div class="arrow">→</div>
+      <div class="step"><b>③ 弹道规划</b><span>plan_shot：脑内飞一遍，二分仰角</span></div>
+      <div class="arrow">→</div>
+      <div class="step"><b>④ 旋转反解</b><span>plan_stroke：按胶皮求拍面倾角与挥速</span></div>
+      <div class="arrow">→</div>
+      <div class="step"><b>⑤ 执行</b><span>扰动拍面与挥速，真实碰撞</span></div>
+    </div>
+  </div>
+  <h3>旋转反解：拍面倾角只能这么大</h3>
+  <div class="eq">
+    J = v<sub>出</sub> − v<sub>入</sub>&nbsp;&nbsp;<span class="c">// 需要的速度冲量</span><br>
+    sinθ = min(需要的倾角, s<sub>max</sub>)&nbsp;&nbsp;<span class="c">// s_max = 技术 × 技术类别 × 胶皮上限 rub_spin_cap × (直板反手 0.9)</span><br>
+    挥速超过 swing_limit → 同时降力量和旋转，重新反解（最多 20 轮）
+  </div>
+  <h3>误差从哪来</h3>
+  <table>
+    <tr><th>来源</th><th>含义</th><th>量级</th></tr>
+    <tr><td>技术</td><td>基础手感</td><td class="num">0.004 + 0.018·(1−tec)</td></tr>
+    <tr><td>力量</td><td>发力越大越难控</td><td class="num">×(0.6 + 0.7·pw)</td></tr>
+    <tr><td>疲劳 / 切换 / 跑动 / 够球</td><td>动作变形</td><td class="num">×(1+0.5·fat)(1+3·awk)(1+1.5·stretch)…</td></tr>
+    <tr><td>准备不足</td><td>引拍时间不够（快球威胁的来源）</td><td class="num">×(1 + 0.7·lack)</td></tr>
+    <tr><td>吃转</td><td>进攻技术打下旋 / 挡球接强上旋</td><td class="num">×(1 + VS·来球旋转)</td></tr>
+    <tr><td>高球</td><td>击球点高，进攻更容易</td><td class="num">×(1 − 0.35·hi)</td></tr>
+    <tr><td>握法</td><td>直板反手横打 / 直板台内与推挡</td><td class="num">×1.12 / ×0.85、×0.92</td></tr>
+  </table>
+  <h3>技术是“算出来的”，不是选出来的</h3>
+  <p class="small">网络没有“选择技术”这一维。<code>classify_stroke</code> 按击球点离台远近、高度、力度、旋转意图判出 8 个物理大类，
+  <code>tech_of</code> 再按正反手、来球旋转、落点长短、侧旋细分成 17 种（只影响显示、统计和动画）：</p>
+  <table>
+    <tr><th>物理大类</th><th>判定</th><th>细分</th></tr>
+    <tr><td>扣杀</td><td>击球点高于台面 0.30 m、力度 &gt;0.55、不是下旋意图</td><td>扣杀</td></tr>
+    <tr><td>削球</td><td>下旋意图且离台 &gt;0.45 m</td><td>削球（远台，从肩高向前下方切）</td></tr>
+    <tr><td>搓球</td><td>下旋意图、近台</td><td>摆短（落点 &lt;0.6 m）· 劈长（&gt;0.95 m 且发力）· 搓球</td></tr>
+    <tr><td>放高球</td><td>离台 &gt;1.1 m、力度 &lt;0.45</td><td>放高球</td></tr>
+    <tr><td>挑打</td><td>击球点在台内</td><td>挑打 · 抹（轻、带侧旋）· 反手拧拉 · 霸王拧（大力拧强下旋）</td></tr>
+    <tr><td>挡球</td><td>力度 &lt;0.35、近台</td><td>挡球 · 侧切（反手、拍面半侧立向侧下切）</td></tr>
+    <tr><td>快攻</td><td>上旋意图 &lt;0.35</td><td>快攻</td></tr>
+    <tr><td>拉球</td><td>其余</td><td>提拉（来球下旋）· 前冲弧圈（大力）· 撕（反手近台快拉）· 拉球</td></tr>
+  </table>
+</section>
+
+<section id="move">
+  <h2><span class="num">1.6</span>移动：会影响击球质量的步法物理</h2>
+  <p class="lead">物理层只模拟和击球质量有关的三件事：<b>到位时间</b>、<b>够球程度</b>、<b>重心方向</b>。
+  “迈哪只脚、怎么迈”属于表现层，见第四部分的步法动画。</p>
+  <div class="grid g3">
+    <div class="card"><h4>垫步（默认）</h4><p class="small">随时可变向；站稳后再起动有 0.3 s 的分腿垫步加速。</p></div>
+    <div class="card"><h4>交叉步</h4><p class="small">动作第 11 维 &gt;0.3 且横向输入大时触发：速度上限 ×1.5，但迈出后必须走完约 0.3 s，收不住。</p></div>
+    <div class="card"><h4>重心预压</h4><p class="small">动作第 10 维把重心压向一侧：压对起动快，压错先移回来——假动作在物理上的作用点。</p></div>
+  </div>
+  <div class="card">
+    <h4>够球</h4>
+    <p class="small">手的可达范围是一个区间（自己视角）：正手横向 [−0.68, −0.08] m、反手 [−0.12, 0.45] m，向台内可探 1.1 m。
+    球在一个子步内走过的线段与手的距离 &lt; 0.14 m 就算碰到。够到了但拉伸大，误差上升；
+    <code>predict</code> 给出早点/晚点两个候选击球点，反应延迟之后才“看得见”。</p>
+  </div>
+</section>
+
+<section id="serve">
+  <h2><span class="num">1.7</span>发球：两跳规则与八种手法</h2>
+  <div class="card">
+    <div class="eq">
+      plan_serve_shot：外层二分水平速度 → 第二跳落在目标深度；内层二分竖直速度 → 第一跳落在本方台面离网 d1 处
+    </div>
+    <p class="small">抛球高度 0.3–1.8 m，抛得越高旋转越强、越难控制；奔球、急球固定低抛。发球时可以“回抛”藏动作，有 5% 被判违例。<br>
+    击球点离台面 0.17–0.20 m；奔球、急球压到 0.12 m（约与网同高），第一跳压在本方端线附近，出球水平速度约 9–11 m/s，普通长球约 7.5 m/s，短球 4–5 m/s。</p>
+  </div>
+  <table>
+    <tr><th>手法（右手）</th><th>旋转上限</th><th>侧旋方向</th><th>侧旋占比</th><th>误差</th><th>迷惑性</th><th>还原</th><th>球速</th><th>可发旋转</th></tr>
+    <tr><td>正手侧旋</td><td class="num">1.00</td><td>左侧旋</td><td class="num">0.80</td><td class="num">1.00</td><td class="num">1.00</td><td class="num">0.25 s</td><td class="num">1.0</td><td>侧上 / 侧下</td></tr>
+    <tr><td>勾手</td><td class="num">0.90</td><td>右侧旋</td><td class="num">1.00</td><td class="num">0.95</td><td class="num">1.35</td><td class="num">0.30 s</td><td class="num">1.0</td><td>上下旋动作一致，最隐蔽</td></tr>
+    <tr><td>逆旋转</td><td class="num">1.05</td><td>右侧旋</td><td class="num">1.00</td><td class="num">1.30</td><td class="num">1.15</td><td class="num">0.30 s</td><td class="num">1.0</td><td>大幅甩腕，旋转最强的下手发球</td></tr>
+    <tr><td>下蹲砍式</td><td class="num">1.25</td><td>左右都能</td><td class="num">1.20</td><td class="num">1.30</td><td class="num">1.25</td><td class="num">0.50 s</td><td class="num">1.0</td><td>侧旋最强，还原最慢</td></tr>
+    <tr><td>砍式</td><td class="num">1.00</td><td>随意</td><td class="num">0.25</td><td class="num">1.00</td><td class="num">1.10</td><td class="num">0.22 s</td><td class="num">1.15</td><td>以下旋为主</td></tr>
+    <tr><td>正手奔球</td><td class="num">0.70</td><td>右侧旋</td><td class="num">0.50</td><td class="num">1.00</td><td class="num">0.80</td><td class="num">0.20 s</td><td class="num">1.5</td><td>只有上旋，又急又长</td></tr>
+    <tr><td>反手侧旋</td><td class="num">0.80</td><td>右侧旋</td><td class="num">0.90</td><td class="num">0.90</td><td class="num">0.90</td><td class="num">0.10 s</td><td class="num">0.9</td><td>还原最快</td></tr>
+    <tr><td>反手急球</td><td class="num">0.60</td><td>随意</td><td class="num">0.20</td><td class="num">1.00</td><td class="num">0.85</td><td class="num">0.10 s</td><td class="num">1.35</td><td>速度为主，可带急下旋</td></tr>
+  </table>
+  <p class="small">左手球员所有侧旋方向取反；直板发球误差 ×0.88、迷惑性 ×1.1；发球旋转上限再受胶皮限制（长胶发不出转）。
+  接发球方对每种发球有“熟悉度”，越熟悉判断越准，详见第二部分的战术脑。</p>
+</section>
+
+<section id="rules">
+  <h2><span class="num">1.8</span>回合流程与判罚</h2>
+  <div class="card">
+    <div class="flow">
+      <div class="step"><b>PH_SERVE</b><span>抛球、调整；计时到出手</span></div><div class="arrow">→</div>
+      <div class="step"><b>PH_FLY</b><span>飞行，双方移动/击球</span></div><div class="arrow">→</div>
+      <div class="step"><b>得分判定</b><span>出界 / 下网 / 落己方 / 没接到 / 超时 / 违例</span></div><div class="arrow">→</div>
+      <div class="step"><b>下一分</b><span>训练立刻重开；游戏死球停顿</span></div>
+    </div>
+  </div>
+  <table>
+    <tr><th></th><th>训练</th><th>游戏 / 评估</th></tr>
+    <tr><td>站位</td><td>随机</td><td>固定</td></tr>
+    <tr><td>接发等候</td><td colspan="2">发球出手前，接发球方只能站在离端线 0.3–0.7 m、自己视角横向 −0.15 ~ +0.35 m（中间略偏反手侧）的等候区里；出手后自由移动。没有这条时，因为发球全是长球，策略学会了站在端线后 1.4 m、台外 1 m 等球（试过按距离扣分，策略宁可挨罚也不站过来）</td></tr>
+    <tr><td>发球等待</td><td>0.15–1.8 s 随机</td><td>1.8 s</td></tr>
+    <tr><td>属性与器材</td><td>随机，每分 15% 概率重抽</td><td>界面设定（默认右手横板两面反胶）</td></tr>
+    <tr><td>单分超时</td><td>20 s，双方各 −1</td><td>90 s，只防卡死</td></tr>
+  </table>
+</section>
+
+<!-- =================================================================== -->
+<div class="part p2" id="p2">
+  <div class="pn">PART TWO</div>
+  <h1>二、强化学习建模</h1>
+  <p>两名球员共用一个策略网络，观测与动作都在各自视角下；左右手、握法、胶皮都是观测的一部分。</p>
+</div>
+
+<section id="rl-obs">
+  <h2><span class="num">2.1</span>观测：104 维</h2>
+  <table>
+    <tr><th>维度</th><th>内容</th><th>说明</th></tr>
+    <tr><td class="num">0–14</td><td>自己位置/速度、球位置/速度/旋转</td><td>自己视角；横向乘 lat_m，旋转按赝矢量镜像（左手要多乘一次 hs）</td></tr>
+    <tr><td class="num">15–25</td><td>对手位置、轮次/弹跳/阶段、预测击球点</td><td>击球点受反应延迟限制</td></tr>
+    <tr><td class="num">26–40</td><td>双方五维属性、疲劳、发球方、双方正反手</td><td>—</td></tr>
+    <tr><td class="num">41–49</td><td>击球点相对手的位置、重心、引拍方向</td><td>够不够得着 / 假动作</td></tr>
+    <tr><td class="num">50–56</td><td>自己球风、站稳程度、还原时间</td><td>—</td></tr>
+    <tr><td class="num">57–67</td><td>发球手法 one-hot、抛球高度、回抛、第一板</td><td>发球方知道自己的计划</td></tr>
+    <tr><td class="num">68–86</td><td>对手速度/站稳、双方对 8 种发球的熟悉度</td><td>—</td></tr>
+    <tr><td class="num">87–88</td><td>双方发球属性</td><td>—</td></tr>
+    <tr><td class="num">89</td><td>对手是否和我同手</td><td><code>hs·hs_对手</code>：左右手对阵时对手的正手在我的同侧</td></tr>
+    <tr><td class="num">90–91</td><td>双方握法</td><td>横板 0 / 直板 1</td></tr>
+    <tr><td class="num">92–103</td><td>双方正反手胶皮的 (e, μ, ks)</td><td>用物理参数而不是编号：网络能在“胶皮空间”里插值</td></tr>
+  </table>
+  <div class="note"><b>向后兼容：</b>新维度都追加在末尾。旧模型（87 维）照样能玩——<code>play.py</code> 把观测截到模型的维度；
+  热启动时按重叠维度复制第一层权重，新维度权重从 0 开始。</div>
+</section>
+
+<section id="rl-act">
+  <h2><span class="num">2.2</span>动作：12 维连续量（裁剪到 [−1, 1]）</h2>
+  <table>
+    <tr><th>维度</th><th>含义</th><th>映射</th></tr>
+    <tr><td class="num">0–2</td><td>前后 / 横向 / 手的高度</td><td class="num">× 极速（自己视角）</td></tr>
+    <tr><td class="num">3–4</td><td>落点深度 / 横向</td><td class="num">0.3–1.2 m 离网 / ±0.7 m</td></tr>
+    <tr><td class="num">5</td><td>发力</td><td class="num">pw = (a+1)/2</td></tr>
+    <tr><td class="num">6–7</td><td>上下旋 / 侧旋意图</td><td class="num">−1 纯下旋 … +1 纯上旋</td></tr>
+    <tr><td class="num">8</td><td>正手 / 反手</td><td class="num">按速率渐变</td></tr>
+    <tr><td class="num">9</td><td>抛球高度（发球）/ 重心预压（相持）</td><td class="num">—</td></tr>
+    <tr><td class="num">10</td><td>引拍方向（假动作）</td><td class="num">误导对手重心</td></tr>
+    <tr><td class="num">11</td><td>交叉步 / 发球回抛</td><td class="num">&gt;0.3 交叉步；发球 &gt;0.5 回抛</td></tr>
+  </table>
+</section>
+
+<section id="rl-rew">
+  <h2><span class="num">2.3</span>奖励</h2>
+  <table>
+    <tr><th>事件</th><th>奖励</th><th>意图</th></tr>
+    <tr><td>回球落对方台面</td><td class="num">+0.03 + 球风匹配</td><td>稠密信号，把回合拉起来</td></tr>
+    <tr><td>对手没碰到球 / 对手失误</td><td class="num">±1.2 / ±1.0</td><td>主动得分更值钱</td></tr>
+    <tr><td>超时</td><td class="num">双方 −1.0</td><td>挤掉“光搓不攻”的消耗战</td></tr>
+    <tr><td>接球方靠近预测击球点</td><td class="num">+0.3·距离缩短量</td><td>引导跑位</td></tr>
+    <tr><td>非接球方回预备位</td><td class="num">−0.003·距离</td><td>回位习惯</td></tr>
+    <tr><td>移动功耗</td><td class="num">−0.0005·|a<sub>0..2</sub>|²</td><td>别乱晃</td></tr>
+  </table>
+</section>
+
+<section id="rl-tac">
+  <h2><span class="num">2.4</span>发球战术脑：bandit，不是神经网络</h2>
+  <div class="eq">
+    score(k) = (w<sub>k</sub> + prior<sub>k</sub>·N<sub>0</sub>)/(n<sub>k</sub> + N<sub>0</sub>) − λ·熟悉度(k)<br>
+    P(k) = softmax(score(k)/τ)&nbsp;&nbsp;<span class="c">// τ=0.06, N₀=4, λ=0.25；每分后 w,n ← 0.92·w,n 再累加</span>
+  </div>
+  <p class="small">纯 PPO 很难在“发球类型”这种低频高方差维度上学出多样性，容易塌缩到一种发球。
+  手法与“下旋/不转/上旋”变化交给显式的多臂老虎机，重复使用会被预判；落点、力度、抛球高度、回抛仍由网络决定。</p>
+</section>
+
+<!-- =================================================================== -->
+<div class="part p3" id="p3">
+  <div class="pn">PART THREE</div>
+  <h1>三、RL 训练</h1>
+  <p>PPO + 自我对弈 + 脚本 AI + 历史快照池。物理改了，策略就要重训——它学的是这个世界的因果。</p>
+</div>
+
+<section id="ppo">
+  <h2><span class="num">3.1</span>PPO 训练流程</h2>
+  <div class="card">
+    <div class="flow">
+      <div class="step"><b>并行采样</b><span>2048 张台 × 128 步，numba 16 线程</span></div><div class="arrow">→</div>
+      <div class="step"><b>GAE</b><span>γ=0.99，λ=0.95</span></div><div class="arrow">→</div>
+      <div class="step"><b>PPO 更新</b><span>clip 0.2，4 epoch，minibatch 16384，GPU</span></div><div class="arrow">→</div>
+      <div class="step"><b>存档</b><span>numpy 格式，游戏端不依赖 torch</span></div>
+    </div>
+  </div>
+  <table>
+    <tr><th>对手来源</th><th>比例</th><th>作用</th></tr>
+    <tr><td>当前策略（自我对弈）</td><td class="num">其余</td><td>两边都学，天然对称</td></tr>
+    <tr><td>脚本 AI</td><td class="num">15%</td><td>外部基准，防止共同退化（日志里的 win vs bot）</td></tr>
+    <tr><td>历史快照池（≤12 个，每 25 轮入池）</td><td class="num">30%</td><td>避免只会克制当前的自己</td></tr>
+  </table>
+  <div class="grid g2">
+    <div class="card"><h4>观测归一化与方差下限</h4><p class="small">运行均值/方差，裁剪 ±10。长期为常数的维度方差极小，一开就爆——热启动时用 <code>--var-floor 57:65</code> 给发球维度设下限。</p></div>
+    <div class="card"><h4>动作均值边界惩罚</h4><p class="small"><code>0.1·Σ max(|μ|−1,0)²</code>：均值漂出 [−1,1] 后梯度消失，惩罚把它拉回来。</p></div>
+    <div class="card"><h4>探索噪声夹紧</h4><p class="small">std ∈ [0.15, 0.35]：太小过早收敛成一种打法，太大只敢打保险球。</p></div>
+    <div class="card"><h4>KL 早停</h4><p class="small">KL &gt; 0.03 停本轮 epoch；log-ratio 夹在 ±20 防溢出。</p></div>
+  </div>
+</section>
+
+<section id="lessons">
+  <h2><span class="num">3.2</span>平衡：几次典型的“练歪了”</h2>
+  <div class="card"><h4>① 挡球一家独大</h4><p class="small">挡球借力、误差小，早期全场只挡。修法：来球太慢借不上力（<code>NOPACE</code>），被动挡慢球会送机会球。</p></div>
+  <div class="card"><h4>② 全场只搓</h4><p class="small">“搓到超时”期望更高，每分 19 拍、65% 超时。修法：超时双方各 −1，连续搓球越来越容易冒高（幅度必须够大才有效）。</p></div>
+  <div class="card"><h4>③ 发球直接得分率异常</h4><p class="small">训练与部署不一致：训练发球等待短、游戏长，接发方多站一秒走偏。训练等待拉宽到 0.15–1.8 s 后恢复正常。</p></div>
+  <div class="card"><h4>④ 换了器材，旧模型就“不认识”</h4><p class="small">加入左右手、胶皮后，旧模型（看不到这些维度）左手对右手每分只有 3.15 拍，反手长胶胜率掉到 42–45%——这是必须重训的直接证据。</p></div>
+  <div class="note"><b>方法论：</b>先关掉机制做 A/B（改 numba 常量必须清 <code>__pycache__/*.nbi,*.nbc</code>），用探针脚本量化行为变化，再决定要不要重训。</div>
+</section>
+
+<section id="retrain">
+  <h2><span class="num">3.3</span>本次重训：器材版 v35 → v36</h2>
+  <div class="card">
+    <div class="eq" style="font-size:13px">
+      python train.py --warm models\policy.npz --out models\policy_v35_equip.npz ^<br>
+      &nbsp;&nbsp;--iters 6000 --envs 2048 --threads 16 --tthreads 2 --var-floor 57:65
+    </div>
+    <ul class="tight small">
+      <li>从 v33（87 维）热启动，观测扩到 104 维；训练时左手、直板各 25%，胶皮按上面的比例抽。</li>
+      <li>每轮约 1.4 s，6000 轮约 2.5 小时。</li>
+      <li>镜像校验：左手对左手与右手对右手统计一致（0 号胜率 49.8% vs 49.9%），说明镜像是精确的。</li>
+    </ul>
+    <p class="small">第二段 v36：从 v35 继续 3000 轮，并用新加的 <code>--pool-add</code> 把 v33 放进对手池常驻（20% 的对局），
+    防止自我对弈只学会克制自己。游戏现在用的是 v36（旧模型备份为 <code>models/policy_v33_backup.npz</code>）。</p>
+    <p class="small">v38（均衡器材）：按真实比例抽器材时，两面长胶这种组合出现的概率只有约千分之一，模型几乎没练过，一碰上就打得很难看。
+    所以训练改成均匀抽样：左右手各 50%、横直板各 50%，正反面胶皮在 5 种里各自均匀抽（两面长胶 1/25）。
+    游戏界面的“随机器材”按钮仍按真实比例抽。从 v37 热启动 10000 轮，v37 常驻对手池（25% 的对局）。</p>
+    <table id="retrain-result">
+      <tr><th>指标</th><th>v33（旧，87 维）</th><th>v35</th><th>v36（当前）</th></tr>
+      <tr><td>对脚本 AI 胜率（比赛模式）</td><td class="num">88.7%</td><td class="num">89.4%</td><td class="num">89.2%</td></tr>
+      <tr><td>左手对右手 每分拍数（同手约 5.3–6.1）</td><td class="num">3.15</td><td class="num">3.16</td><td class="num">3.72</td></tr>
+      <tr><td>反手长胶 对 两面反胶 胜率</td><td class="num">≈42–45%</td><td class="num">39.1%</td><td class="num">46.0%</td></tr>
+      <tr><td>反手防弧 对 两面反胶 胜率</td><td class="num">—</td><td class="num">39.9%</td><td class="num">47.4%</td></tr>
+      <tr><td>对 v33 直接对打（随机属性与器材）</td><td class="num">—</td><td class="num">—</td><td class="num">55.8%</td></tr>
+      <tr><td>对 v33 直接对打（默认：属性 60、右手横板两面反胶）</td><td class="num">—</td><td class="num">38.4%</td><td class="num">37.4%</td></tr>
+    </table>
+    <div class="note warn"><b>还没解决的：</b>在默认配置下 v36 仍打不过专门在这个配置上练出来的 v33，而且 v35/v36 的削球占比明显偏高（17–19%，v33 只有 2%）；
+    左手对右手的回合仍偏短——发球方发完球站在反手位，接发方回到正手大角时发球方只能碰到 89%（同手时 99%）。
+    物理和观测本身是对称的（脚本 AI 在四种持拍手组合下每分都约 6.2 拍），是策略还没学会针对左手调整站位。</div>
+  </div>
+</section>
+
+<!-- =================================================================== -->
+<div class="part p4" id="p4">
+  <div class="pn">PART FOUR</div>
+  <h1>四、画面渲染</h1>
+  <p>pygame 只会画 2D，人物、球拍、球台全靠自己做透视投影和明暗；动画层只读物理状态，按资料里的动作要领摆姿势。</p>
+</div>
+
+<section id="r3d">
+  <h2><span class="num">4.1</span>相机与立体人物</h2>
+  <div class="grid g2">
+    <div class="card">
+      <h4>相机</h4>
+      <p class="small">绕目标点旋转的透视相机（方位角、仰角、距离、焦距）。拖动旋转、滚轮缩放、C 复位。
+      球的轨迹按旋转类型着色，右下角小球窗口放大 10 倍显示旋转轴和转速。</p>
+    </div>
+    <div class="card">
+      <h4>Painter：深度排序的 3D 图元</h4>
+      <ul class="tight small">
+        <li><b>胶囊</b>（四肢、躯干肩线）：沿轴向做 5 段平滑明暗渐变 + 圆头。</li>
+        <li><b>球体</b>（头、关节）：预渲染的径向渐变贴图，按半径和颜色缓存；头部叠头发。</li>
+        <li><b>六面体</b>（躯干、腰臀、鞋；裤腿是随大腿摆动的圆柱）：背面剔除，每个面按法线与光的夹角做 Lambert 明暗。</li>
+        <li><b>圆盘</b>（球拍）：有厚度的边、黑色正手面 / 红色反手面（职业选手最常见的配法），颗粒胶皮画颗粒点，长胶、防弧带色调。</li>
+        <li>一盏斜上方主光 + 环境光 0.42；所有图元按到相机的深度从远到近画（画家算法）。</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card">
+    <h4>骨架</h4>
+    <p class="small"><code>body_points</code> 从物理状态（位置、速度、正反手 blend、重心、下蹲）推出骨架关节：
+    髋、肩、头、双脚（踩实不滑）、膝（两段 IK）、持拍臂（肩—肘—手两段 IK，肘的朝向由“肘极点”控制）、非持拍手配合。
+    左手球员所有横向量乘持拍手符号，整个人镜像；直板反手拍头朝下、拍柄更短。</p>
+  </div>
+</section>
+
+<section id="ranim">
+  <h2><span class="num">4.2</span>击球动作：按动作要领对齐</h2>
+  <p class="lead">每种技术一组关键帧（引拍点、随挥点、转腰、下沉、肘位、拍面朝向，都在自己视角下）。
+  时间轴：击球前 0.5 s 开始引拍，最后 0.18 s 挥拍，击球后 0.12 s 随挥到位、0.5 s 内还原。
+  引拍和随挥都<b>锚定在真实击球点</b>上——无论球在哪，拍子都正好在击球那一帧碰到球。进攻技术的动作幅度随发力缩放。</p>
+  <table>
+    <tr><th>技术</th><th>资料里的动作要领</th><th>动画里的对应</th></tr>
+    <tr><td>正手拉球</td><td>重心在右脚，拍引到身体右后下方；蹬地转腰带臂，向前上方摩擦，随势挥到左额前</td><td>引拍 (后 0.45, 外 0.3, 下 0.3)，随挥到额前上方，转腰 0.8</td></tr>
+    <tr><td>前冲弧圈</td><td>引拍更靠后、更平，发力以向前为主，弧线低</td><td>引拍更后更平，随挥偏前</td></tr>
+    <tr><td>提拉</td><td>对付下旋：引拍更低，向上发力为主</td><td>引拍低到 0.42，随挥向上</td></tr>
+    <tr><td>正手快攻</td><td>小引拍，前臂快速收缩向左前方击打，结束在额前</td><td>引拍 (后 0.22)，随挥到左前</td></tr>
+    <tr><td>反手拉球</td><td>拍引到腹前左下方、肘在体前、手腕内收；以肘为轴向右前上方发力，随挥到右额前</td><td>引拍在腹前、低于肩，肘前顶，随挥到右上方</td></tr>
+    <tr><td>撕</td><td>反手近台，小引拍，借上旋快速向右前上方带</td><td>小幅度、高速度</td></tr>
+    <tr><td>拧拉 / 霸王拧</td><td>台内，拍头朝下、手腕内屈，由左后向右前上方拧</td><td>专门的肘位和拍面朝向，霸王拧幅度更大</td></tr>
+    <tr><td>挡球 / 侧切</td><td>拍面前倾，几乎不引拍，借力；侧切拍面半侧立向侧下切</td><td>位移极小；侧切单独设定拍面</td></tr>
+    <tr><td>摆短 / 搓 / 劈长</td><td>拍面后仰，向前下方触球；摆短动作最小，劈长前送最长</td><td>三档幅度递增</td></tr>
+    <tr><td>削球</td><td>远台，拍引到肩高，从上向前下方切削，随势到腹前</td><td>引拍抬到 +0.55，随挥到 −0.45</td></tr>
+    <tr><td>扣杀</td><td>高引拍，全身发力向前下方击打</td><td>转腰最大 1.0</td></tr>
+    <tr><td>放高球</td><td>远台，低引拍向上方挥送，把球送高送远</td><td>随挥向上 0.7</td></tr>
+  </table>
+  <p class="small">练习页可以强制相持技术：接发方用选中的技术，发球方当陪练（削球、挡球对拉，放高球对扣杀，搓对搓），专门观察平时很少出现的动作。</p>
+</section>
+
+<section id="rfoot">
+  <h2><span class="num">4.3</span>步法动画</h2>
+  <p class="lead">脚平时踩实不动，离理想站位远了才迈步。每一步先按局面选步法，再生成“哪只脚、走多久、抬多高”的步子队列。</p>
+  <table>
+    <tr><th>步法</th><th>要领</th><th>什么时候用</th></tr>
+    <tr><td>小碎步</td><td>高频小垫步微调击球点</td><td>快到击球、差一点点</td></tr>
+    <tr><td>单步</td><td>一脚为轴，另一脚向来球方向迈一步</td><td>距离小（&lt;0.3 m）</td></tr>
+    <tr><td>并步</td><td>一脚先向另一脚并半步，另一脚再向来球方向移，重心起伏小</td><td>中等距离，时间充裕</td></tr>
+    <tr><td>跨步</td><td>一脚蹬地，另一脚跨出一大步，重心压低，蹬地脚随后跟半步</td><td>来球远、时间紧</td></tr>
+    <tr><td>跳步</td><td>双脚几乎同时离地，离来球远的脚先落地</td><td>高速大范围移动</td></tr>
+    <tr><td>交叉步</td><td>远离来球的脚从体前交叉跨出，另一脚跟上</td><td>物理层触发了交叉步</td></tr>
+    <tr><td>侧身步</td><td>非持拍侧的脚先向反手位跨，持拍侧脚后撤，让出正手位</td><td>用正手打反手位来球</td></tr>
+    <tr><td>救球</td><td><b>先打再调整</b>：击球时伸到极限，打完重心继续往外冲、压低，再碎步还原</td><td>横向够到极限才击中</td></tr>
+    <tr><td>倒地爆冲</td><td>正手大力拉冲时够到极限：身体几乎扑倒、单膝快着地，打完再爬起</td><td>救球 + 正手进攻 + 大挥速</td></tr>
+  </table>
+  <p class="small">步法名会显示在球员脚下；救球和倒地爆冲用更醒目的标签。正常比赛里救球约占步法的 0.3–0.6%，倒地爆冲更少；
+  想专门看，在练习页选“相持技术 → 救球爆冲”：陪练连续压接球方正手大角，接球方横向起动慢半拍，只能伸到极限去够。</p>
+</section>
+
+<section id="rsound">
+  <h2><span class="num">4.4</span>音效：公开录音</h2>
+  <table>
+    <tr><th>声音</th><th>来源与处理</th><th>随什么变</th></tr>
+    <tr><td>击球</td><td>Freesound 上两段 CC0 拍面击球录音（michorvath、el_boss），切成 9 次单独击球</td><td>胶皮：正胶、生胶略升调、加高频、余音更短（更脆）；长胶、防弧降调、低通、余音很短（更闷）。挥拍越快越响、音调略高（5 种胶皮 × 3 档力度 × 4 个变体）</td></tr>
+    <tr><td>落台</td><td>LaSonotheque 四段 CC0 录音棚球弹跳录音，各取最响的 4 次，共 16 个变体；略压最高频</td><td>按落台速度定音量</td></tr>
+    <tr><td>落地</td><td>同一批录音里弹得低、轻的几次</td><td>按落地速度定音量</td></tr>
+    <tr><td>擦网</td><td>落台录音降调、低通到 1.2 kHz，像撞到网绳的闷响</td><td>—</td></tr>
+    <tr><td>掌声</td><td>LaSonotheque 约 40 人小观众鼓掌（CC0），取最热烈的 4 秒</td><td>长回合（≥9 拍）或倒地爆冲后响起</td></tr>
+  </table>
+  <p class="small">录音原文件在 <code>assets/sounds/</code>，<code>_cut_sounds.py</code> 把它们切成单次撞击存进 <code>cut/</code>，来源和许可写在 <code>CREDITS.txt</code>。
+  左右声道按球在画面上的位置分配；声卡不可用时自动静音。左下角“静音”按钮或按 M 开关声音。</p></section>
+
+<section id="rui">
+  <h2><span class="num">4.5</span>界面</h2>
+  <table>
+    <tr><th>侧栏页</th><th>内容</th></tr>
+    <tr><td>属性</td><td>六项属性滑条，每方可选 RL 模型或脚本 AI</td></tr>
+    <tr><td>风格</td><td>四个球风</td></tr>
+    <tr><td>器材</td><td>持拍手（右/左）、握法（横板/直板）、正反手胶皮（5 种）；换手或握法从这一分重开</td></tr>
+    <tr><td>练习</td><td>指定发球方、手法、抛球、旋转、落点，以及<b>强制相持技术</b>；不计分、无疲劳</td></tr>
+  </table>
+  <p class="small">比分牌下方显示双方器材；左上显示本拍发球/接发的技术、旋转和转速；左下是上一拍的技术、挥速、身体发力占比。</p>
+</section>
+
+<!-- ============ 代码地图 ============ -->
+<section id="code">
+  <h2><span class="num">05</span>代码地图与常用命令</h2>
+  <div class="grid g2">
+    <div class="card">
+      <h4>核心文件</h4>
+      <table>
+        <tr><td><code>pingpong/sim.py</code></td><td>全部物理、规则、器材、观测、发球战术脑</td></tr>
+        <tr><td><code>pingpong/env.py</code></td><td>多球台封装</td></tr>
+        <tr><td><code>train.py</code></td><td>PPO 自我对弈训练（torch）</td></tr>
+        <tr><td><code>pingpong/nn.py</code></td><td>numpy 推理与存档</td></tr>
+        <tr><td><code>play.py</code></td><td>游戏主程序：骨架、界面、音效调度</td></tr>
+        <tr><td><code>anim.py</code></td><td>击球、发球、步法、救球动画</td></tr>
+        <tr><td><code>render3d.py</code></td><td>立体图元绘制（Painter）</td></tr>
+        <tr><td><code>sound.py</code></td><td>音效：加载录音、按胶皮和发力处理</td></tr>
+        <tr><td><code>pingpong/tactics.py</code></td><td>战术识别统计（只读）</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h4>常用命令</h4>
+      <div class="eq" style="font-size:12.5px">
+        python play.py<br><br>
+        <span class="c"># 训练（热启动）</span><br>
+        python train.py --warm models\policy.npz ^<br>
+        &nbsp;&nbsp;--out models\policy_new.npz --iters 6000 ^<br>
+        &nbsp;&nbsp;--envs 2048 --var-floor 57:65<br><br>
+        <span class="c"># 器材/镜像检查、步法统计、练习技术检查</span><br>
+        python _equip.py models\policy.npz<br>
+        python _gait.py 300<br>
+        python _prac.py 40<br><br>
+        <span class="c"># 改物理后必须清缓存</span><br>
+        Remove-Item pingpong\__pycache__\*.nbi, *.nbc
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    本文档由代码直接整理，参数以 <code>pingpong/sim.py</code> 当前版本为准。
+  </div>
+</section>
+
+</main>
+
+<script>
+(function () {
+  const cv = document.getElementById('traj');
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const KD = 0.1396, KM = 0.00335, G = 9.81;
+  const X0 = -1.62, Z0 = 0.96, VX = 7.2, TARGET = 1.02;
+
+  // 世界坐标 -> 画布坐标
+  const L = 58, R = cv.width - 26, TOPP = 34, BOT = cv.height - 46;
+  const xmin = -2.0, xmax = 2.0, zmin = 0.35, zmax = 1.42;
+  const px = x => L + (x - xmin) / (xmax - xmin) * (R - L);
+  const py = z => BOT - (z - zmin) / (zmax - zmin) * (BOT - TOPP);
+
+  function simulate(top, vz) {
+    let x = X0, z = Z0, vx = VX, vy = 0, vzc = vz, wx = 0, wy = top, wz = 0;
+    const dt = 0.0004, pts = [];
+    for (let k = 0; k < 6000; k++) {
+      const sp = Math.hypot(vx, vy, vzc);
+      const ax = -KD * sp * vx + KM * (wy * vzc - wz * vy);
+      const ay = -KD * sp * vy + KM * (wz * vx - wx * vzc);
+      const az = -KD * sp * vzc + KM * (wx * vy - wy * vx) - G;
+      vx += ax * dt; vy += ay * dt; vzc += az * dt;
+      x += vx * dt; z += vzc * dt;
+      pts.push([x, z]);
+      if (k % 12 === 0 && pts.length > 4000) break;
+      if (z < 0.76 && Math.abs(x) <= 1.37) return { pts: pts, land: x, hit: true };
+      if (z < 0.3 || Math.abs(x) > 3.2) break;
+    }
+    return { pts: pts, land: x, hit: false };
+  }
+
+  function landingVz(top) {
+    // 二分竖直初速，使球落在 TARGET
+    let lo = 0.5, hi = 9.0, best = 4.0;
+    for (let i = 0; i < 40; i++) {
+      const mid = 0.5 * (lo + hi);
+      const r = simulate(top, mid);
+      if (r.hit && r.land < TARGET) lo = mid; else hi = mid;
+      best = mid;
+    }
+    return 0.5 * (lo + hi);
+  }
+
+  function path(r, color, width) {
+    ctx.beginPath();
+    r.pts.forEach((p, k) => {
+      const a = px(p[0]), b = py(p[1]);
+      if (k === 0) ctx.moveTo(a, b); else ctx.lineTo(a, b);
+    });
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineJoin = 'round';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(px(r.land), py(0.772), 3.4, 0, Math.PI * 2);
+    ctx.fillStyle = color; ctx.fill();
+  }
+
+  function arrow(x1, z1, x2, z2, color) {
+    ctx.beginPath();
+    ctx.moveTo(px(x1), py(z1));
+    ctx.lineTo(px(x2), py(z2));
+    ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, cv.width, cv.height);
+
+    // 网格
+    ctx.strokeStyle = 'rgba(43,52,68,.55)'; ctx.lineWidth = 1;
+    for (let z = 0.4; z <= 1.4; z += 0.2) {
+      ctx.beginPath(); ctx.moveTo(L, py(z)); ctx.lineTo(R, py(z)); ctx.stroke();
+      ctx.fillStyle = '#6b7787'; ctx.font = '11px Consolas';
+      ctx.fillText(z.toFixed(1) + 'm', 10, py(z) + 4);
+    }
+
+    // 球台
+    ctx.fillStyle = '#1b3a52';
+    ctx.fillRect(px(-1.37), py(0.76), px(1.37) - px(-1.37), py(0.70) - py(0.76) + 8);
+    ctx.strokeStyle = '#4cc9f0'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(px(-1.37), py(0.76)); ctx.lineTo(px(1.37), py(0.76)); ctx.stroke();
+    // 网
+    ctx.strokeStyle = '#c9d4e3'; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(px(0), py(0.76)); ctx.lineTo(px(0), py(0.9125)); ctx.stroke();
+    ctx.fillStyle = '#8b98ab'; ctx.font = '11px "Microsoft YaHei"';
+    ctx.fillText('网 0.1525m', px(0) + 6, py(0.925) - 4);
+
+    const r1 = simulate(-120, landingVz(-120));
+    const r2 = simulate(0, landingVz(0));
+    const r3 = simulate(180, landingVz(180));
+    path(r1, '#f2b35c', 2.2);
+    path(r2, '#8b98ab', 2.2);
+    path(r3, '#4cc9f0', 2.4);
+
+    // 落点虚线
+    [r1, r2, r3].forEach(r => {
+      if (r.hit) {
+        ctx.beginPath();
+        ctx.moveTo(px(r.land), py(0.76));
+        ctx.lineTo(px(r.land), py(0.76) + 26);
+        ctx.strokeStyle = 'rgba(255,255,255,.22)';
+        ctx.setLineDash([3, 3]); ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
+      }
+    });
+
+    // 出手点
+    ctx.beginPath();
+    ctx.arc(px(X0), py(Z0), 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#eaf2ff'; ctx.fill();
+    ctx.fillStyle = '#8b98ab'; ctx.font = '11px "Microsoft YaHei"';
+    ctx.fillText('出手点', px(X0) - 16, py(Z0) - 10);
+
+    // 标注
+    ctx.fillStyle = r1.hit ? '#f2b35c' : '#8b98ab';
+    ctx.font = '12px "Microsoft YaHei"';
+    ctx.fillText('下旋：落台前“飘”，落台后刹车', px(-1.25), py(1.30));
+    ctx.fillStyle = '#4cc9f0';
+    ctx.fillText('上旋：过网后下扎', px(0.45), py(1.34));
+  }
+
+  draw();
+})();
+</script>
+<script>
+(function () {
+  // 与 sim.racket_impact 相同的碰撞公式
+  const R = 0.02, KI = 2 / 3, KST = KI / (1 + KI);
+  const RUB = [["反胶", 0.86, 1.20, 1.45, "#ff6b6b"], ["正胶", 0.88, 0.55, 0.80, "#f2b35c"],
+               ["生胶", 0.90, 0.40, 0.55, "#e6d36a"], ["长胶", 0.72, 0.14, 0.15, "#b197fc"],
+               ["防弧", 0.70, 0.20, 0.25, "#6ee7a8"]];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const add = (a, b, k) => [a[0] + k * b[0], a[1] + k * b[1], a[2] + k * b[2]];
+  const nrm = a => Math.hypot(a[0], a[1], a[2]);
+  function impact(v, w, n, vp, e, mu, ks) {
+    const u = add(v, vp, -1);
+    const un = Math.min(dot(u, n), -0.05);
+    const jn = -(1 + e) * un;
+    const c = add(u, cross(w, n), -R);
+    const s = add(c, n, -dot(c, n));
+    const sn = nrm(s);
+    let jt = [0, 0, 0];
+    if (sn > 1e-9) jt = s.map(x => -Math.min(ks * KST * sn, mu * jn) / sn * x);
+    const v2 = add(add(v, n, jn), jt, 1);
+    const w2 = add(w, cross(n, jt), -1 / (KI * R));
+    return [v2, w2];
+  }
+  const top = (v, w) => { const h = Math.hypot(v[0], v[1]) + 1e-9; return w[0] * (-v[1] / h) + w[1] * (v[0] / h); };
+  const unit = a => { const k = nrm(a); return a.map(x => x / k); };
+  let mode = "block";
+  const sl = document.getElementById("rubSpin"), lab = document.getElementById("rubSpinV");
+  const box = document.getElementById("rubBars");
+  const bB = document.getElementById("rubBlock"), bL = document.getElementById("rubLoop");
+  if (!sl) return;
+  function draw() {
+    const sp = +sl.value;
+    lab.textContent = (sp >= 0 ? "上旋 " : "下旋 ") + Math.abs(sp) + " rad/s";
+    const v = [-12, 0, -0.5], w = [0, -sp, 0];
+    const n = mode === "block" ? unit([0.97, 0, -0.24]) : unit([0.85, 0, -0.53]);
+    const vp = mode === "block" ? [0, 0, 0] : [8, 0, 6];
+    let html = "";
+    RUB.forEach(r => {
+      const [v2, w2] = impact(v, w, n, vp, r[1], r[2], r[3]);
+      const t = top(v2, w2), kmh = nrm(v2) * 3.6;
+      const f = Math.max(-1, Math.min(1, t / 450));
+      const left = f >= 0 ? 50 : 50 + f * 50, width = Math.abs(f) * 50;
+      html += `<div>${r[0]}</div><div class="bar"><i style="left:${left}%;width:${width}%;background:${r[4]}"></i><span class="mid"></span></div>` +
+              `<div class="mono">${t >= 0 ? "上" : "下"}旋 ${Math.abs(t).toFixed(0)} · ${kmh.toFixed(0)} km/h</div>`;
+    });
+    box.innerHTML = html;
+  }
+  sl.addEventListener("input", draw);
+  bB.onclick = () => { mode = "block"; bB.classList.add("on"); bL.classList.remove("on"); draw(); };
+  bL.onclick = () => { mode = "loop"; bL.classList.add("on"); bB.classList.remove("on"); draw(); };
+  draw();
+})();
+</script>
+</body>
+</html>

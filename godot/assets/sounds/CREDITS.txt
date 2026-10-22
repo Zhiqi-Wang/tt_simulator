@@ -1,0 +1,13 @@
+游戏里的击球、落台声来自以下公开录音（全部 CC0 / 公共领域，可自由使用、修改、商用，无需署名），
+由 _cut_sounds.py 切成单次撞击存在 cut/ 目录：
+
+fs269718_hit.ogg      "Ping pong ball hit" by michorvath
+                      https://freesound.org/people/michorvath/sounds/269718/   CC0
+fs628636_paddle.ogg   "Ping Pong - Hard Paddle (Thin)" by el_boss
+                      https://freesound.org/s/628636/   CC0
+lso2236..2239_bounce.ogg
+                      "Balle de ping-pong, rebond #1–#4" by Joseph SARDIN (LaSonotheque / BigSoundBank)
+                      https://lasonotheque.org/balle-de-ping-pong-rebond-2-s2237.html   CC0
+                      （落台、落地、球网都由这批录音处理得到）
+lso3520_applause.ogg  "Applaudissement 40 pers. #4" by Joseph SARDIN (LaSonotheque)
+                      https://lasonotheque.org/applaudissement-40-pers-4-s3520.html   CC0
